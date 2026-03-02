@@ -1342,6 +1342,17 @@ const FacultyDashboard = () => {
 
             if (response.ok) {
                 showToast(`Message sent to ${feedbackStudent.name}!`, 'success');
+
+                const sentNotif = {
+                    id: `local-${Date.now()}`,
+                    message: feedbackMessage,
+                    type: 'SENT',
+                    category: `📤 Sent to Student: ${feedbackStudent.regNo}`,
+                    createdAt: new Date().toISOString(),
+                    isRead: true
+                };
+                setNotifications(prev => [sentNotif, ...prev]);
+
                 setShowFeedbackModal(false);
                 setFeedbackMessage('');
             } else {
@@ -2006,7 +2017,6 @@ const FacultyDashboard = () => {
                     <h2 className={styles.sectionTitle}>My Students Directory</h2>
                     <div className={styles.headerActions}>
                         <div className={styles.searchWrapper}>
-                            <Search size={20} className={styles.searchIcon} />
                             <input
                                 type="text"
                                 placeholder="Search student..."
@@ -2014,6 +2024,9 @@ const FacultyDashboard = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
+                            <div className={styles.searchIcon}>
+                                <Users size={18} />
+                            </div>
                         </div>
                         <div style={{ position: 'relative' }}>
                             <button
@@ -2027,10 +2040,9 @@ const FacultyDashboard = () => {
                             {/* Section Filter Dropdown */}
                             {facultySections.length > 1 && (
                                 <select
-                                    className={styles.deptSelect}
+                                    className={styles.filterSelect}
                                     value={selectedSection}
                                     onChange={(e) => setSelectedSection(e.target.value)}
-                                    style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}
                                 >
                                     <option value="All">All Sections</option>
                                     {facultySections.map(sec => <option key={sec} value={sec}>Section {sec}</option>)}
@@ -3486,8 +3498,7 @@ const FacultyDashboard = () => {
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <select
-                            className={styles.searchInput}
-                            style={{ width: 'auto', padding: '8px 12px', fontSize: '0.9rem' }}
+                            className={styles.filterSelect}
                             value={filterSubject}
                             onChange={(e) => setFilterSubject(e.target.value)}
                         >
@@ -3497,8 +3508,7 @@ const FacultyDashboard = () => {
                             ))}
                         </select>
                         <select
-                            className={styles.searchInput}
-                            style={{ width: 'auto', padding: '8px 12px', fontSize: '0.9rem' }}
+                            className={styles.filterSelect}
                             value={filterCIE}
                             onChange={(e) => setFilterCIE(e.target.value)}
                         >
@@ -3687,14 +3697,27 @@ const FacultyDashboard = () => {
                 </div>
                 <div className={styles.notificationsList}>
                     {notifications.length > 0 ? notifications.map(notif => (
-                        <div key={notif.id} className={`${styles.notifItem} ${!notif.isRead ? styles.unread : ''}`} style={{ position: 'relative' }}>
-                            <div className={styles.notifIcon}>
-                                {notif.type === 'INFO' ? <Bell size={20} /> : <AlertCircle size={20} />}
+                        <div key={notif.id} className={`${styles.notifItem} ${!notif.isRead ? styles.unread : ''}`} style={{
+                            position: 'relative',
+                            background: notif.type === 'SENT' ? 'linear-gradient(90deg, #f0fdf4, #dcfce7)' : undefined,
+                            borderLeft: notif.type === 'SENT' ? '3px solid #16a34a' : 'none'
+                        }}>
+                            <div className={styles.notifIcon} style={{
+                                background: notif.type === 'SENT' ? '#dcfce7' : undefined,
+                                color: notif.type === 'SENT' ? '#16a34a' : undefined
+                            }}>
+                                {notif.type === 'SENT' ? <Send size={20} /> : notif.type === 'INFO' ? <Bell size={20} /> : <AlertCircle size={20} />}
                             </div>
                             <div className={styles.notifContent} style={{ paddingRight: '20px' }}>
+                                {notif.type === 'SENT' && (
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Sent</span>
+                                )}
                                 <p className={styles.notifMessage}>{notif.message}</p>
                                 <span className={styles.notifTime}>{new Date(notif.createdAt).toLocaleString()}</span>
-                                {notif.category && <span className={styles.notifCategory}>{notif.category}</span>}
+                                {notif.category && <span className={styles.notifCategory} style={{
+                                    background: notif.type === 'SENT' ? '#bbf7d0' : undefined,
+                                    color: notif.type === 'SENT' ? '#15803d' : undefined
+                                }}>{notif.category}</span>}
                             </div>
                             <button
                                 onClick={(e) => { e.stopPropagation(); handleDeleteNotification(notif.id); }}

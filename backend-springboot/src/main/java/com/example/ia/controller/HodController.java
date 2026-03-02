@@ -6,6 +6,9 @@ import com.example.ia.repository.FacultyAssignmentRequestRepository;
 import com.example.ia.repository.StudentRepository;
 import com.example.ia.repository.SubjectRepository;
 import com.example.ia.repository.UserRepository;
+import com.example.ia.repository.AttendanceRepository;
+import com.example.ia.repository.NotificationRepository;
+import com.example.ia.repository.CieMarkRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,7 +43,13 @@ public class HodController {
     PasswordEncoder passwordEncoder;
 
     @Autowired
-    com.example.ia.repository.CieMarkRepository cieMarkRepository;
+    CieMarkRepository cieMarkRepository;
+
+    @Autowired
+    AttendanceRepository attendanceRepository;
+
+    @Autowired
+    NotificationRepository notificationRepository;
 
     @Autowired
     FacultyAssignmentRequestRepository assignmentRequestRepository;
@@ -615,11 +624,48 @@ public class HodController {
         }
     }
 
-    @Autowired
-    com.example.ia.repository.AttendanceRepository attendanceRepository;
+    @PutMapping("/students/{regNo}")
+    @PreAuthorize("hasRole('HOD')")
+    @Transactional
+    public ResponseEntity<?> updateStudent(@PathVariable String regNo, @RequestBody Map<String, String> data) {
+        return studentRepository.findByRegNo(regNo).map(student -> {
+            // Find corresponding User
+            User user = userRepository.findByUsernameIgnoreCase(regNo).orElse(null);
 
-    @Autowired
-    com.example.ia.repository.NotificationRepository notificationRepository;
+            if (data.containsKey("name")) {
+                student.setName(data.get("name"));
+                if (user != null)
+                    user.setFullName(data.get("name"));
+            }
+            if (data.containsKey("email")) {
+                student.setEmail(data.get("email"));
+                if (user != null)
+                    user.setEmail(data.get("email"));
+            }
+            if (data.containsKey("semester")) {
+                student.setSemester(Integer.parseInt(data.get("semester")));
+                if (user != null)
+                    user.setSemester(data.get("semester"));
+            }
+            if (data.containsKey("section")) {
+                student.setSection(data.get("section"));
+                if (user != null)
+                    user.setSection(data.get("section"));
+            }
+            if (data.containsKey("phone")) {
+                student.setPhone(data.get("phone"));
+            }
+            if (data.containsKey("parentPhone")) {
+                student.setParentPhone(data.get("parentPhone"));
+            }
+
+            studentRepository.save(student);
+            if (user != null)
+                userRepository.save(user);
+
+            return ResponseEntity.ok(Map.of("message", "Student updated successfully"));
+        }).orElse(ResponseEntity.notFound().build());
+    }
 
     @DeleteMapping("/students/{regNo}")
     @PreAuthorize("hasRole('HOD')")

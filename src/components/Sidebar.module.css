@@ -95,7 +95,7 @@
     font-size: 0.95rem;
     /* Larger font */
     font-weight: 600;
-    color: var(--text-primary);
+    color: #000000;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -131,7 +131,7 @@
     font-size: 0.75rem;
     /* Larger header */
     font-weight: 700;
-    color: var(--text-secondary);
+    color: #000000;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 1rem 0 0.4rem 0.6rem;
@@ -156,8 +156,8 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border-radius: 10px;
-    color: var(--text-secondary);
-    /* Slate Text */
+    color: #000000;
+    /* Slate Text -> Pure Black */
     text-decoration: none;
     font-size: 0.95rem;
     font-weight: 500;

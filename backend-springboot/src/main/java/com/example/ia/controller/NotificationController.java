@@ -86,6 +86,18 @@ public class NotificationController {
             notificationRepository.save(notif);
         }
 
+        // ✅ Save a "Sent" copy for the sender themselves
+        Notification sentCopy = new Notification();
+        sentCopy.setUser(sender);
+        sentCopy.setMessage(message);
+        sentCopy.setType("SENT");
+        String scopeLabel = (targetDepartment != null && !targetDepartment.isEmpty()
+                && !"ALL".equalsIgnoreCase(targetDepartment))
+                        ? targetDepartment + " " + targetRole + "s"
+                        : "All " + targetRole + "s";
+        sentCopy.setCategory("📤 Sent to " + targets.size() + " " + scopeLabel);
+        notificationRepository.save(sentCopy);
+
         System.out.println("DEBUG: Broadcast sent to " + targets.size() + " recipients.");
         return ResponseEntity.ok(Map.of("message", "Notification broadcast to " + targets.size() + " recipients"));
     }
@@ -174,6 +186,16 @@ public class NotificationController {
         notif.setType("ALERT");
         notif.setCategory("Faculty Feedback: " + (faculty != null ? faculty.getFullName() : "Faculty"));
         notificationRepository.save(notif);
+
+        // ✅ Save a "Sent" copy for the faculty sender
+        if (faculty != null) {
+            Notification sentCopy = new Notification();
+            sentCopy.setUser(faculty);
+            sentCopy.setMessage(message);
+            sentCopy.setType("SENT");
+            sentCopy.setCategory("📤 Sent to Student: " + studentRegNo);
+            notificationRepository.save(sentCopy);
+        }
 
         return ResponseEntity.ok(Map.of("message", "Notification sent to student " + studentRegNo));
     }

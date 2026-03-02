@@ -53,16 +53,18 @@ const Sidebar = ({ menuItems }) => {
                 })}
             </nav>
 
-            {/* Profile Card */}
-            <div className={styles.userInfo} onClick={() => setShowProfile(true)} style={{ cursor: 'pointer' }} title="View Profile">
-                <div className={styles.avatar}>
-                    {(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}
+            {/* Profile Card - Hide for Students */}
+            {user?.role?.toUpperCase() !== 'STUDENT' && (
+                <div className={styles.userInfo} onClick={() => setShowProfile(true)} style={{ cursor: 'pointer' }} title="View Profile">
+                    <div className={styles.avatar}>
+                        {(user?.fullName || user?.username || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className={styles.userDetails}>
+                        <p className={styles.userName}>{user?.fullName || user?.username || 'User'}</p>
+                        <p className={styles.userRole}>{user?.role || 'Staff'}{user?.department ? ` • ${user.department}` : ''}</p>
+                    </div>
                 </div>
-                <div className={styles.userDetails}>
-                    <p className={styles.userName}>{user?.fullName || user?.username || 'User'}</p>
-                    <p className={styles.userRole}>{user?.role || 'Staff'}{user?.department ? ` • ${user.department}` : ''}</p>
-                </div>
-            </div>
+            )}
 
             <button onClick={logout} className={styles.logoutButton}>
                 <LogOut size={20} />

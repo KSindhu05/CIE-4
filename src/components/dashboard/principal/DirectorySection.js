@@ -260,18 +260,16 @@ export const DirectorySection = memo(({ departments = [], selectedDept, deptStud
                 border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '1rem'
             }}>
                 <div style={{ display: 'flex', gap: '1rem', flex: 1 }}>
-                    <div style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <div className={styles.searchWrapper}>
                         <input
                             placeholder="Search by Name or Reg No..."
+                            className={styles.searchInput}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{
-                                padding: '0.7rem 0.7rem 0.7rem 2.5rem', borderRadius: '10px',
-                                border: '1px solid #e2e8f0', outline: 'none', width: '100%', fontSize: '0.95rem',
-                                background: '#f8fafc'
-                            }}
                         />
+                        <div className={styles.searchIcon}>
+                            <Search size={18} />
+                        </div>
                     </div>
 
                     <button
@@ -291,9 +289,9 @@ export const DirectorySection = memo(({ departments = [], selectedDept, deptStud
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
                         <select
+                            className={styles.filterSelect}
                             value={semester}
                             onChange={(e) => setSemester(e.target.value)}
-                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', outline: 'none', background: 'white', fontSize: '0.9rem', fontWeight: 500, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                         >
                             {['1st', '2nd', '3rd', '4th', '5th'].map(sem => (
                                 <option key={sem} value={sem}>{sem} Sem</option>
@@ -301,9 +299,9 @@ export const DirectorySection = memo(({ departments = [], selectedDept, deptStud
                         </select>
 
                         <select
+                            className={styles.filterSelect}
                             value={section}
                             onChange={(e) => setSection(e.target.value)}
-                            style={{ padding: '0.5rem 1rem', borderRadius: '8px', border: 'none', outline: 'none', background: 'white', fontSize: '0.9rem', fontWeight: 500, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                         >
                             <option value="A">Section A</option>
                             <option value="B">Section B</option>

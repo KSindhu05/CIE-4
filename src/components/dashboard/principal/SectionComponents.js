@@ -67,25 +67,23 @@ export const FacultyDirectorySection = memo(({ facultyMembers = [], onRemove }) 
                 background: 'white', padding: '1rem', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                 border: '1px solid #e2e8f0'
             }}>
-                <div style={{ position: 'relative', width: '300px' }}>
-                    <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <div className={styles.searchWrapper}>
                     <input
                         placeholder="Search Faculty..."
+                        className={styles.searchInput}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        style={{
-                            padding: '0.6rem 0.6rem 0.6rem 2.5rem', borderRadius: '10px',
-                            border: '1px solid #e2e8f0', outline: 'none', width: '100%', fontSize: '0.9rem',
-                            background: '#f8fafc'
-                        }}
                     />
+                    <div className={styles.searchIcon}>
+                        <Search size={18} />
+                    </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <select
+                        className={styles.filterSelect}
                         value={selectedDept}
                         onChange={(e) => setSelectedDept(e.target.value)}
-                        style={{ padding: '0.6rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', background: 'white', color: '#64748b' }}
                     >
                         {departments.map(dept => (
                             <option key={dept} value={dept}>{dept}</option>
@@ -359,9 +357,10 @@ export const NotificationsSection = memo(({
                     <div>
                         <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#374151' }}>Recipient Group</label>
                         <select
+                            className={styles.filterSelect}
+                            style={{ width: '100%' }}
                             value={recipientType}
                             onChange={(e) => setRecipientType && setRecipientType(e.target.value)}
-                            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', fontSize: '0.9rem', background: 'white' }}
                         >
                             <option value="HOD">All HODs</option>
                             <option value="FACULTY">All Faculty</option>
@@ -371,9 +370,10 @@ export const NotificationsSection = memo(({
                     <div>
                         <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#374151' }}>Target Department</label>
                         <select
+                            className={styles.filterSelect}
+                            style={{ width: '100%' }}
                             value={targetDept}
                             onChange={(e) => setTargetDept && setTargetDept(e.target.value)}
-                            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #e5e7eb', fontSize: '0.9rem', background: 'white' }}
                         >
                             <option value="ALL">All Departments</option>
                             <option value="CSE">CSE</option>
@@ -412,7 +412,7 @@ export const NotificationsSection = memo(({
             {/* Notifications List */}
             <div className={styles.glassCard} style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#1e293b' }}>All Notifications</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#1e293b' }}>Inbox &amp; Sent</h3>
                     {notifications.length > 0 && onClear && (
                         <button
                             onClick={onClear}
@@ -424,14 +424,34 @@ export const NotificationsSection = memo(({
                 </div>
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                     {notifications.length > 0 ? notifications.map(notif => (
-                        <div key={notif.id} style={{ position: 'relative', display: 'flex', gap: '0.75rem', alignItems: 'flex-start', padding: '0.85rem', borderBottom: '1px solid #f1f5f9', background: notif.isRead ? 'transparent' : '#f0f9ff', borderRadius: '6px', marginBottom: '4px' }}>
-                            <div style={{ padding: '0.5rem', background: notif.type === 'WARNING' ? '#fef3c7' : '#e0f2fe', borderRadius: '8px', color: notif.type === 'WARNING' ? '#d97706' : '#0369a1', flexShrink: 0 }}>
-                                {notif.type === 'WARNING' ? <AlertTriangle size={18} /> : <Bell size={18} />}
+                        <div key={notif.id} style={{
+                            position: 'relative', display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
+                            padding: '0.85rem',
+                            borderBottom: '1px solid #f1f5f9',
+                            background: notif.type === 'SENT'
+                                ? 'linear-gradient(90deg, #f0fdf4, #dcfce7)'
+                                : notif.isRead ? 'transparent' : '#f0f9ff',
+                            borderLeft: notif.type === 'SENT' ? '3px solid #16a34a' : 'none',
+                            borderRadius: '6px', marginBottom: '4px'
+                        }}>
+                            <div style={{
+                                padding: '0.5rem',
+                                background: notif.type === 'SENT' ? '#dcfce7'
+                                    : notif.type === 'WARNING' ? '#fef3c7' : '#e0f2fe',
+                                borderRadius: '8px',
+                                color: notif.type === 'SENT' ? '#16a34a'
+                                    : notif.type === 'WARNING' ? '#d97706' : '#0369a1',
+                                flexShrink: 0
+                            }}>
+                                {notif.type === 'SENT' ? <Send size={18} /> : notif.type === 'WARNING' ? <AlertTriangle size={18} /> : <Bell size={18} />}
                             </div>
                             <div style={{ flex: 1 }}>
+                                {notif.type === 'SENT' && (
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Sent</span>
+                                )}
                                 <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem', fontWeight: 500, color: '#1e293b' }}>{notif.message}</p>
                                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{new Date(notif.createdAt).toLocaleString()}</span>
-                                {notif.category && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', color: '#475569' }}>{notif.category}</span>}
+                                {notif.category && <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', background: notif.type === 'SENT' ? '#bbf7d0' : '#f1f5f9', padding: '2px 8px', borderRadius: '4px', color: notif.type === 'SENT' ? '#15803d' : '#475569' }}>{notif.category}</span>}
                             </div>
                             {onDelete && (
                                 <button
@@ -686,7 +706,8 @@ export const ManageHODsSection = memo(({ hods = [], onCreate, user, departments 
                         <div className={styles.formGroup}>
                             <label style={{ fontWeight: 600, display: 'block', marginBottom: '0.6rem', color: '#475569', fontSize: '0.9rem' }}>Assigned Department *</label>
                             <select
-                                className={styles.inputField}
+                                className={styles.filterSelect}
+                                style={{ width: '100%' }}
                                 value={department}
                                 onChange={(e) => setDepartment(e.target.value)}
                                 required

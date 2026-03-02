@@ -5,7 +5,7 @@ import DashboardLayout from '../components/DashboardLayout';
 import {
     LayoutDashboard, Users, FileText, CheckCircle, TrendingUp, BarChart2,
     AlertTriangle, Briefcase, Bell, Activity, Clock, Award,
-    Edit, Save, LogOut, ShieldAlert, X, BookOpen, Layers, Megaphone, Calendar, MapPin, PenTool, Download, Mail, Trash2, Key, UserPlus, Upload, GitPullRequest, Eye
+    Edit, Save, LogOut, ShieldAlert, X, BookOpen, Layers, Megaphone, Calendar, MapPin, PenTool, Download, Mail, Trash2, Key, UserPlus, Upload, GitPullRequest, Eye, Send
 } from 'lucide-react';
 import {
     departments, subjectsByDept, getStudentsByDept, englishMarks, mathsMarks,
@@ -124,11 +124,15 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
     const [unreadCount, setUnreadCount] = useState(0);
 
     // Student Management State
-    const [showAddStudentModal, setShowAddStudentModal] = useState(false);
     const [studentForm, setStudentForm] = useState({
         regNo: '', name: '', email: '', phone: '', parentPhone: '',
         semester: '1', section: 'A', password: 'password123'
     });
+    const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+    const [searchTermAll, setSearchTermAll] = useState('');
+    const [searchTermMgmt, setSearchTermMgmt] = useState('');
+    const [showEditStudentModal, setShowEditStudentModal] = useState(false);
+    const [editingStudent, setEditingStudent] = useState(null);
 
     // Reset Password State
     const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
@@ -251,6 +255,17 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
             if (allOk) {
                 const groupName = messageRecipientType === 'BOTH' ? 'Students and Faculty' : `${messageRecipientType.toLowerCase()}s`;
                 alert(`Message sent to all ${groupName}!`);
+
+                const sentNotif = {
+                    id: `local-${Date.now()}`,
+                    message: newMessageText,
+                    type: 'SENT',
+                    category: `📤 Sent to all ${groupName}`,
+                    createdAt: new Date().toISOString(),
+                    isRead: true
+                };
+                setNotifications(prev => [sentNotif, ...prev]);
+
                 setNewMessageText('');
             } else {
                 console.error('Some messages failed');
@@ -827,6 +842,26 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
         }
     }, [activeTab, isMyDept, selectedDept]);
 
+    // Handle subject auto-selection when semester or subjects change in update-marks tab
+    useEffect(() => {
+        if (activeTab === 'update-marks' && subjects.length > 0) {
+            const filtered = subjects.filter(sub => {
+                if (sub.name === 'IC') return false;
+                if (selectedSemester !== 'all' && sub.semester != selectedSemester) return false;
+                return true;
+            });
+
+            if (filtered.length > 0) {
+                // If current selectedSubject is not in filtered list, pick the first one
+                if (!selectedSubject || !filtered.find(s => s.id === selectedSubject.id)) {
+                    setSelectedSubject(filtered[0]);
+                }
+            } else {
+                setSelectedSubject(null);
+            }
+        }
+    }, [activeTab, subjects, selectedSemester]);
+
     const commonOptions = { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } }, maintainAspectRatio: false };
     const doughnutOptions = { responsive: true, plugins: { legend: { position: 'right' } }, maintainAspectRatio: false };
 
@@ -1062,6 +1097,48 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
         }
     };
 
+
+    const handleEditStudent = (std) => {
+        setEditingStudent(std);
+        setStudentForm({
+            regNo: std.regNo,
+            name: std.name,
+            email: std.email || '',
+            phone: std.phone || '',
+            parentPhone: std.parentPhone || '',
+            semester: String(std.semester || '1'),
+            section: std.section || 'A'
+        });
+        setShowEditStudentModal(true);
+    };
+
+    const handleUpdateStudent = async (e) => {
+        if (e) e.preventDefault();
+        try {
+            const token = user?.token;
+            const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+            const response = await fetch(`${API_BASE_URL}/hod/students/${editingStudent.regNo}`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(studentForm)
+            });
+
+            if (response.ok) {
+                alert('Student updated successfully!');
+                setShowEditStudentModal(false);
+                setEditingStudent(null);
+                setStudentForm({ regNo: '', name: '', email: '', phone: '', parentPhone: '', semester: '1', section: 'A', password: 'password123' });
+                window.location.reload();
+            } else {
+                const err = await response.json().catch(() => ({ message: 'Error updating student' }));
+                alert(`Failed: ${err.message}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error updating student');
+        }
+    };
+
     const openResetPasswordModal = (username, fullName, role) => {
         setResetTarget({ username, fullName, role });
         setNewPassword('');
@@ -1196,12 +1273,14 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
 
     const renderStudentManagement = () => {
         // Calculate available sections
-        const allSections = [...new Set(deptStudents.map(s => s.section || 'A'))].sort();
+        const allSections = [...new Set(deptStudents.flatMap(s => (s.section || 'A').split(',').map(sec => sec.trim().toUpperCase())))].sort();
 
         const filteredStudents = deptStudents.filter(std => {
             const semMatch = studentFilterSem === 'all' || std.semester == studentFilterSem;
-            const secMatch = studentFilterSec === 'all' || (std.section && std.section.toUpperCase() === studentFilterSec);
-            return semMatch && secMatch;
+            const secMatch = studentFilterSec === 'all' || (std.section && std.section.toUpperCase().split(',').map(s => s.trim()).includes(studentFilterSec));
+            const searchMatch = (std.name || '').toLowerCase().includes(searchTermMgmt.toLowerCase()) ||
+                (std.regNo || '').toLowerCase().includes(searchTermMgmt.toLowerCase());
+            return semMatch && secMatch && searchMatch;
         });
 
         const allVisibleSelected = filteredStudents.length > 0 && filteredStudents.every(s => selectedStudents.includes(s.regNo));
@@ -1223,13 +1302,27 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                     </div>
 
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <select className={styles.deptSelect} value={studentFilterSem} onChange={(e) => setStudentFilterSem(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                        <div className={styles.searchWrapper}>
+                            <input
+                                type="text"
+                                placeholder="Search by name or Reg No..."
+                                className={styles.searchInput}
+                                value={searchTermMgmt}
+                                onChange={(e) => setSearchTermMgmt(e.target.value)}
+                            />
+                            <div className={styles.searchIcon}>
+                                <Users size={18} />
+                            </div>
+                        </div>
+
+                        <select className={styles.filterSelect} value={studentFilterSem} onChange={(e) => setStudentFilterSem(e.target.value)}>
                             <option value="all">All Semesters</option>
                             {[1, 2, 3, 4, 5, 6].map(sem => (
                                 <option key={sem} value={sem}>{sem}{sem === 1 ? 'st' : sem === 2 ? 'nd' : sem === 3 ? 'rd' : 'th'} Semester</option>
                             ))}
                         </select>
-                        <select className={styles.deptSelect} value={studentFilterSec} onChange={(e) => setStudentFilterSec(e.target.value)} style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+
+                        <select className={styles.filterSelect} value={studentFilterSec} onChange={(e) => setStudentFilterSec(e.target.value)}>
                             <option value="all">All Sections</option>
                             {allSections.map(sec => (
                                 <option key={sec} value={sec}>Section {sec}</option>
@@ -1295,6 +1388,9 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
 
                                     <td>
                                         <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className={styles.secondaryBtn} onClick={() => handleEditStudent(std)} style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', background: '#ecfdf5', color: '#059669', border: '1px solid #d1fae5' }} title="Edit Student">
+                                                <Edit size={14} /> Edit
+                                            </button>
                                             <button className={styles.secondaryBtn} onClick={() => openResetPasswordModal(std.regNo, std.name, 'STUDENT')} style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', background: '#fef3c7', color: '#d97706', border: '1px solid #fde68a' }} title="Reset Password">
                                                 <Key size={14} /> Reset
                                             </button>
@@ -1376,6 +1472,59 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
         );
     };
 
+    const renderEditStudentModal = () => {
+        if (!showEditStudentModal || !editingStudent) return null;
+
+        return (
+            <div className={styles.modalOverlay}>
+                <div className={styles.modalContent} style={{ maxWidth: '500px' }}>
+                    <div className={styles.modalHeader}>
+                        <h3>Edit Student: {editingStudent.regNo}</h3>
+                        <button className={styles.closeBtn} onClick={() => { setShowEditStudentModal(false); setEditingStudent(null); }}><X size={24} /></button>
+                    </div>
+                    <div className={styles.modalBody}>
+                        <form onSubmit={handleUpdateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className={styles.formGroup}>
+                                <label>Full Name</label>
+                                <input value={studentForm.name} onChange={e => setStudentForm({ ...studentForm, name: e.target.value })} required className={styles.input} />
+                            </div>
+                            <div className={styles.formGroup}>
+                                <label>Email</label>
+                                <input value={studentForm.email} onChange={e => setStudentForm({ ...studentForm, email: e.target.value })} type="email" className={styles.input} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className={styles.formGroup}>
+                                    <label>Semester</label>
+                                    <select value={studentForm.semester} onChange={e => setStudentForm({ ...studentForm, semester: e.target.value })} className={styles.input}>
+                                        {[1, 2, 3, 4, 5, 6].map(s => <option key={s} value={s}>{s}{s === 1 ? 'st' : s === 2 ? 'nd' : s === 3 ? 'rd' : 'th'} Sem</option>)}
+                                    </select>
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>Section</label>
+                                    <input value={studentForm.section} onChange={e => setStudentForm({ ...studentForm, section: e.target.value })} className={styles.input} />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <div className={styles.formGroup}>
+                                    <label>Phone</label>
+                                    <input value={studentForm.phone} onChange={e => setStudentForm({ ...studentForm, phone: e.target.value })} className={styles.input} />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>Parent Phone</label>
+                                    <input value={studentForm.parentPhone} onChange={e => setStudentForm({ ...studentForm, parentPhone: e.target.value })} className={styles.input} />
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                                <button type="button" className={styles.secondaryBtn} onClick={() => { setShowEditStudentModal(false); setEditingStudent(null); }}>Cancel</button>
+                                <button type="submit" className={styles.primaryBtn} style={{ background: '#059669', color: 'white' }}>Update Student</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderResetPasswordModal = () => {
         if (!showResetPasswordModal || !resetTarget) return null;
         return (
@@ -1415,11 +1564,11 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
 
     const renderAllStudents = () => {
         // Calculate available sections based on Students AND Faculty
-        const studentSections = deptStudents.map(s => s.section || 'A');
-        const facultySections = facultyList.map(f => f.section).filter(Boolean); // Filter out null/undefined
+        const studentSections = deptStudents.flatMap(s => (s.section || 'A').split(',').map(sec => sec.trim().toUpperCase()));
+        const facultySections = facultyList.flatMap(f => (f.section || '').split(',').map(sec => sec.trim().toUpperCase())).filter(Boolean);
 
         // Combine and unique
-        const allSections = [...new Set([...studentSections, ...facultySections])].map(s => s.toUpperCase());
+        const allSections = [...new Set([...studentSections, ...facultySections])];
         let uniqueSections = allSections.sort();
 
         // Ensure 'A' is always present if list is empty (default behavior)
@@ -1428,8 +1577,10 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
         // Filter Logic
         const filteredStudents = deptStudents.filter(std => {
             const semMatch = studentFilterSem === 'all' || std.semester == studentFilterSem;
-            const secMatch = studentFilterSec === 'all' || (std.section && std.section.toUpperCase() === studentFilterSec);
-            return semMatch && secMatch;
+            const secMatch = studentFilterSec === 'all' || (std.section && std.section.toUpperCase().split(',').map(s => s.trim()).includes(studentFilterSec));
+            const searchMatch = (std.name || '').toLowerCase().includes(searchTermAll.toLowerCase()) ||
+                (std.regNo || '').toLowerCase().includes(searchTermAll.toLowerCase());
+            return semMatch && secMatch && searchMatch;
         });
 
         return (
@@ -1438,22 +1589,34 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                     <h2 className={styles.sectionTitle} style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b' }}>All Students ({filteredStudents.length})</h2>
 
                     <div className={styles.filterGroup} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div className={styles.searchWrapper}>
+                            <input
+                                type="text"
+                                placeholder="Search students..."
+                                className={styles.searchInput}
+                                value={searchTermAll}
+                                onChange={(e) => setSearchTermAll(e.target.value)}
+                            />
+                            <div className={styles.searchIcon}>
+                                <Users size={18} />
+                            </div>
+                        </div>
+
                         <select
-                            className={styles.deptSelect}
+                            className={styles.filterSelect}
                             value={studentFilterSem}
                             onChange={(e) => setStudentFilterSem(e.target.value)}
-                            style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                         >
                             <option value="all">All Semesters</option>
                             {[1, 2, 3, 4, 5, 6].map(sem => (
                                 <option key={sem} value={sem}>{sem}{sem === 1 ? 'st' : sem === 2 ? 'nd' : sem === 3 ? 'rd' : 'th'} Semester</option>
                             ))}
                         </select>
+
                         <select
-                            className={styles.deptSelect}
+                            className={styles.filterSelect}
                             value={studentFilterSec}
                             onChange={(e) => setStudentFilterSec(e.target.value)}
-                            style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                         >
                             <option value="all">All Sections</option>
                             {uniqueSections.map(sec => (
@@ -1671,12 +1834,27 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                         </div>
                         <div className={styles.notificationsList}>
                             {notifications.length > 0 ? notifications.map(notif => (
-                                <div key={notif.id} className={`${styles.notifItem} ${!notif.isRead ? styles.unread : ''}`} style={{ position: 'relative' }}>
-                                    <div className={styles.notifIcon}>{notif.type === 'INFO' ? <Bell size={20} /> : <AlertTriangle size={20} />}</div>
+                                <div key={notif.id} className={`${styles.notifItem} ${!notif.isRead ? styles.unread : ''}`} style={{
+                                    position: 'relative',
+                                    background: notif.type === 'SENT' ? 'linear-gradient(90deg, #f0fdf4, #dcfce7)' : undefined,
+                                    borderLeft: notif.type === 'SENT' ? '3px solid #16a34a' : 'none'
+                                }}>
+                                    <div className={styles.notifIcon} style={{
+                                        background: notif.type === 'SENT' ? '#dcfce7' : undefined,
+                                        color: notif.type === 'SENT' ? '#16a34a' : undefined
+                                    }}>
+                                        {notif.type === 'SENT' ? <Send size={20} /> : notif.type === 'INFO' ? <Bell size={20} /> : <AlertTriangle size={20} />}
+                                    </div>
                                     <div className={styles.notifContent} style={{ paddingRight: '20px' }}>
+                                        {notif.type === 'SENT' && (
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Sent</span>
+                                        )}
                                         <p className={styles.notifMessage}>{notif.message}</p>
                                         <span className={styles.notifTime}>{new Date(notif.createdAt).toLocaleString()}</span>
-                                        {notif.category && <span className={styles.notifCategory}>{notif.category}</span>}
+                                        {notif.category && <span className={styles.notifCategory} style={{
+                                            background: notif.type === 'SENT' ? '#bbf7d0' : undefined,
+                                            color: notif.type === 'SENT' ? '#15803d' : undefined
+                                        }}>{notif.category}</span>}
                                     </div>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleDeleteNotification(notif.id); }}
@@ -1717,10 +1895,10 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                         // Filter out IC
                         if (sub.name === 'IC') return false;
 
-                        // Check if subject is assigned to any faculty
-                        const isAssigned = facultyList.some(fac => parseSubjects(fac.subjects).includes(sub.name));
-                        // Also include if it's currently selected (to avoid it disappearing)
-                        return isAssigned || (selectedSubject && selectedSubject.id === sub.id);
+                        // Filter by semester if selected
+                        if (selectedSemester !== 'all' && sub.semester != selectedSemester) return false;
+
+                        return true;
                     }).map(sub => (<option key={sub.id} value={sub.id}>{sub.name}</option>))}
                 </select><button className={styles.saveBtn} onClick={saveMarks}><Save size={16} /> Save Changes</button></div></div><p className={styles.helperText}>Edit marks directly in the table. Changes are tracked locally until saved. Max Marks: CIE-1 to CIE-5 (50 each) - Total (250)</p><div className={styles.tableWrapper}><table className={styles.table} style={selectedCieType === 'all' ? { minWidth: '1800px' } : {}}><thead><tr><th>Sl. No.</th><th style={{ width: '150px', minWidth: '150px' }}>Reg No</th><th style={{ width: '350px', minWidth: '350px' }}>Student Name</th>
                     {['cie1', 'all'].includes(selectedCieType) && <th style={['cie1', 'all'].includes(selectedCieType) ? { background: '#eff6ff', color: '#1d4ed8' } : {}}>CIE-1 (50)</th>}
@@ -2515,6 +2693,7 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                 </div>
                 {renderStudentProfileModal()}
                 {renderResetPasswordModal()}
+                {renderEditStudentModal()}
             </div>
         );
     }
@@ -2535,6 +2714,7 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
             </div>
             {renderStudentProfileModal()}
             {renderResetPasswordModal()}
+            {renderEditStudentModal()}
         </DashboardLayout>
     );
 };

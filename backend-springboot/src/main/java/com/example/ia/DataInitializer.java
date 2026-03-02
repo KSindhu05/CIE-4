@@ -247,16 +247,19 @@ public class DataInitializer {
             }
 
             // Only keep real subjects
-            createSubjectIfNotFound(subjectRepository, "Engineering Maths-II", "CSE", "Miss Manju Sree", 2);
-            // 3. Subjects & Marks
-            System.out.println("🌱 Seeding Students, Subjects & Marks...");
-            seedStudents(studentRepository);
+            // createSubjectIfNotFound(subjectRepository, "Engineering Maths-II", "CSE",
+            // "Miss Manju Sree", 2);
+            // // 3. Subjects & Marks
+            // System.out.println("🌱 Seeding Students, Subjects & Marks...");
+            // seedStudents(studentRepository);
 
-            createSubjectIfNotFound(subjectRepository, "DBMS", "CSE", "Nasrin Banu", 6);
-            createSubjectIfNotFound(subjectRepository, "CAEG", "CSE", "Ramesh Gouda", 2);
-            createSubjectIfNotFound(subjectRepository, "Python", "CSE", "Wahida Banu", 2);
-            createSubjectIfNotFound(subjectRepository, "Indian Constitution", "CSE", "Wahida Banu", 2);
-            createSubjectIfNotFound(subjectRepository, "English Communication", "CSE", "Nasrin Banu", 2);
+            // createSubjectIfNotFound(subjectRepository, "CAEG", "CSE", "Ramesh Gouda", 2);
+            // createSubjectIfNotFound(subjectRepository, "Python", "CSE", "Wahida Banu",
+            // 2);
+            // createSubjectIfNotFound(subjectRepository, "Indian Constitution", "CSE",
+            // "Wahida Banu", 2);
+            // createSubjectIfNotFound(subjectRepository, "English Communication", "CSE",
+            // "Nasrin Banu", 2);
 
             // ==========================================
             // SEED MARKS: Add sample CIE marks for students
@@ -300,14 +303,15 @@ public class DataInitializer {
                 System.out.println("✅ Updated " + withMarks.size() + " PENDING marks with data to SUBMITTED");
             }
 
-            for (int i = 0; i < 10; i++) {
-                String regNo = String.format("459CS25%03d", i + 1);
-                for (int j = 0; j < subjects.length; j++) {
-                    seedMarks(studentRepository, userRepository, subjectRepository, cieMarkRepository,
-                            regNo, subjects[j], "CIE1", sampleScores[i][j]);
-                }
-            }
-            System.out.println("✅ Sample CIE marks seeded for 10 students");
+            // for (int i = 0; i < 10; i++) {
+            // String regNo = String.format("459CS25%03d", i + 1);
+            // for (int j = 0; j < subjects.length; j++) {
+            // seedMarks(studentRepository, userRepository, subjectRepository,
+            // cieMarkRepository,
+            // regNo, subjects[j], "CIE1", sampleScores[i][j]);
+            // }
+            // }
+            // System.out.println("✅ Sample CIE marks seeded for 10 students");
 
         };
 
@@ -334,18 +338,22 @@ public class DataInitializer {
     private void createSubjectIfNotFound(com.example.ia.repository.SubjectRepository repo,
             String name, String dept, String instructor, int sem) {
         String code = "SUB" + name.substring(0, 3).toUpperCase();
-        com.example.ia.entity.Subject s = repo.findByCodeAndDepartment(code, dept)
-                .orElseGet(() -> repo.findFirstByName(name).orElse(new com.example.ia.entity.Subject()));
+        // Only create the subject if it doesn't already exist — never overwrite
+        boolean existsByCode = repo.findByCodeAndDepartment(code, dept).isPresent();
+        boolean existsByName = repo.findFirstByName(name).isPresent();
+        if (existsByCode || existsByName) {
+            System.out.println("⏩ Subject already exists, skipping: " + name);
+            return;
+        }
+        com.example.ia.entity.Subject s = new com.example.ia.entity.Subject();
         s.setName(name);
         s.setDepartment(dept);
         s.setInstructorName(instructor);
         s.setSemester(sem);
         s.setCode(code);
-        if (s.getCredits() == null || s.getCredits() == 0) {
-            s.setCredits(4);
-        }
+        s.setCredits(4);
         repo.save(s);
-        System.out.println("✅ Subject updated: " + name + " (dept=" + dept + ", instructor=" + instructor + ")");
+        System.out.println("✅ Subject created: " + name + " (dept=" + dept + ", instructor=" + instructor + ")");
     }
 
     private void seedMarks(com.example.ia.repository.StudentRepository studentRepo,

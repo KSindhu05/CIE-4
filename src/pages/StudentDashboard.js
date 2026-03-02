@@ -4,6 +4,7 @@ import RightSidebar from '../components/RightSidebar'; // Import RightSidebar
 import API_BASE_URL from '../config/api';
 import { LayoutDashboard, FileText, Calendar, Book, User, Download, Bell, TrendingUp, Award, Clock, CheckCircle, Mail, MapPin, ChevronDown, BookOpen, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { fetchSemesterStatus } from '../services/api';
 import styles from './StudentDashboard.module.css';
 import AcademicSummary from '../components/dashboard/student/AcademicSummary';
 import AcademicInsights from '../components/dashboard/student/AcademicInsights';
@@ -25,6 +26,7 @@ const StudentDashboard = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
     const [facultyList, setFacultyList] = useState([]); // Added facultyList state
+    const [semesterStatus, setSemesterStatus] = useState('ACTIVE');
 
     // Student Profile State
     const [studentInfo, setStudentInfo] = useState({
@@ -107,13 +109,14 @@ const StudentDashboard = () => {
                         if (!mark.subject) return;
                         const subId = mark.subject.id;
                         if (!groupedMarks[subId]) {
-                            groupedMarks[subId] = { subject: mark.subject, cie1Score: null, cie2Score: null, cie3Score: null, cie4Score: null, cie5Score: null, cie1Att: null, cie2Att: null, cie3Att: null, cie4Att: null, cie5Att: null, attendancePercentage: null, totalScore: 0, count: 0 };
+                            groupedMarks[subId] = { subject: mark.subject, cie1Score: null, cie2Score: null, cie3Score: null, cie4Score: null, cie5Score: null, cie1Att: null, cie2Att: null, cie3Att: null, cie4Att: null, cie5Att: null, attendancePercentage: null, archivedTotal: null, totalScore: 0, count: 0 };
                         }
                         if (mark.cieType === 'CIE1') groupedMarks[subId].cie1Score = mark.totalScore;
                         else if (mark.cieType === 'CIE2') groupedMarks[subId].cie2Score = mark.totalScore;
                         else if (mark.cieType === 'CIE3') groupedMarks[subId].cie3Score = mark.totalScore;
                         else if (mark.cieType === 'CIE4') groupedMarks[subId].cie4Score = mark.totalScore;
                         else if (mark.cieType === 'CIE5') groupedMarks[subId].cie5Score = mark.totalScore;
+                        else if (mark.cieType === 'TOTAL') groupedMarks[subId].archivedTotal = mark.totalScore;
 
                         // Capture attendance from each CIE record
                         if (mark.cieType === 'CIE1' && mark.attendancePercentage != null) {
@@ -130,7 +133,7 @@ const StudentDashboard = () => {
                     });
 
                     Object.values(groupedMarks).forEach(item => {
-                        let sum = 0;
+                        let sum = item.archivedTotal || 0;
                         if (item.cie1Score != null) sum += item.cie1Score;
                         if (item.cie2Score != null) sum += item.cie2Score;
                         if (item.cie3Score != null) sum += item.cie3Score;
@@ -155,9 +158,19 @@ const StudentDashboard = () => {
                     }));
                     setRealSubjects(subjects);
                 }
-            } catch (error) { console.error("Error fetching marks:", error); }
+            } catch (error) {
+                console.error("Failed to fetch marks", error);
+            }
         };
+
+        const loadSemesterStatus = async () => {
+            const status = await fetchSemesterStatus();
+            if (status) setSemesterStatus(status.status);
+        };
+
         fetchMarks();
+        loadSemesterStatus();
+
         const fetchUpdates = async () => {
             if (!user || !user.token) return;
             try {
@@ -377,14 +390,29 @@ const StudentDashboard = () => {
             });
         });
 
+        const isRestricted = (Number(selectedSemester) < Number(studentInfo.semester)) ||
+            (semesterStatus === 'COMPLETED' && Number(selectedSemester) === Number(studentInfo.semester));
+
         return (
             <div className={styles.detailsContainer}>
+                {isRestricted && (
+                    <div className={styles.card} style={{ marginBottom: '1rem', background: '#fefce8', borderLeft: '4px solid #eab308' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem' }}>
+                            <AlertCircle size={20} style={{ color: '#a16207' }} />
+                            <span style={{ color: '#854d0e', fontSize: '0.9rem', fontWeight: 500 }}>
+                                {Number(selectedSemester) < Number(studentInfo.semester)
+                                    ? `Semester ${selectedSemester} is archived. Displaying Total Marks only.`
+                                    : "The current semester is completed. Displaying Total Marks only."}
+                            </span>
+                        </div>
+                    </div>
+                )}
                 <div className={styles.card} style={{ marginBottom: '1.5rem', animationDelay: '0.1s' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                         <div className={styles.selectionRow} style={{ flex: 1 }}>
-                            <div className={styles.selectionGroup}><label className={styles.selectionLabel}>Select Semester:</label><select value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)} className={styles.selectInput}>{[1, 2, 3, 4, 5, 6].map(sem => <option key={sem} value={sem}>Semester {sem}</option>)}</select></div>
+                            <div className={styles.selectionGroup}><label className={styles.selectionLabel}>Select Semester:</label><select value={selectedSemester} onChange={(e) => setSelectedSemester(e.target.value)} className={styles.filterSelect}>{[1, 2, 3, 4, 5, 6].map(sem => <option key={sem} value={sem}>Semester {sem}</option>)}</select></div>
                             <div className={styles.selectionGroup}><label className={styles.selectionLabel}>Select Internals:</label>
-                                <select value={selectedCIE} onChange={(e) => setSelectedCIE(e.target.value)} className={styles.selectInput}>
+                                <select value={selectedCIE} onChange={(e) => setSelectedCIE(e.target.value)} className={styles.filterSelect}>
                                     <option value="All">All Internals</option>
                                     <option value="CIE-1">CIE-1</option>
                                     <option value="CIE-2">CIE-2</option>
@@ -429,19 +457,23 @@ const StudentDashboard = () => {
                                         <th>Subject</th>
                                         {selectedCIE === 'All' && (
                                             <>
-                                                <th>CIE-1</th>
-                                                <th>Att %</th>
-                                                <th>CIE-2</th>
-                                                <th>Skill Test 1</th>
-                                                <th>Skill Test 2</th>
-                                                <th>Activities</th>
+                                                {(!isRestricted) && (
+                                                    <>
+                                                        <th>CIE-1</th>
+                                                        <th>Att %</th>
+                                                        <th>CIE-2</th>
+                                                        <th>Skill Test 1</th>
+                                                        <th>Skill Test 2</th>
+                                                        <th>Activities</th>
+                                                    </>
+                                                )}
                                             </>
                                         )}
-                                        {selectedCIE === 'CIE-1' && <><th>CIE-1</th><th>Att %</th></>}
-                                        {selectedCIE === 'CIE-2' && <><th>CIE-2</th><th>Att %</th></>}
-                                        {selectedCIE === 'CIE-3' && <><th>Skill Test 1</th><th>Att %</th></>}
-                                        {selectedCIE === 'CIE-4' && <><th>Skill Test 2</th><th>Att %</th></>}
-                                        {selectedCIE === 'CIE-5' && <><th>Activities</th><th>Att %</th></>}
+                                        {selectedCIE === 'CIE-1' && !isRestricted && <><th>CIE-1</th><th>Att %</th></>}
+                                        {selectedCIE === 'CIE-2' && !isRestricted && <><th>CIE-2</th><th>Att %</th></>}
+                                        {selectedCIE === 'CIE-3' && !isRestricted && <><th>Skill Test 1</th><th>Att %</th></>}
+                                        {selectedCIE === 'CIE-4' && !isRestricted && <><th>Skill Test 2</th><th>Att %</th></>}
+                                        {selectedCIE === 'CIE-5' && !isRestricted && <><th>Activities</th><th>Att %</th></>}
 
                                         <th>Total</th>
                                         <th style={{ background: '#fefce8', color: '#a16207' }}>Remarks</th>
@@ -477,7 +509,7 @@ const StudentDashboard = () => {
                                                 <td>{item.code}</td>
                                                 <td>{item.subject}</td>
 
-                                                {selectedCIE === 'All' && (
+                                                {selectedCIE === 'All' && !isRestricted && (
                                                     <>
                                                         <td>{item.cie1 !== '-' ? `${item.cie1} / 50` : '-'}</td>
                                                         <td>{item.attendance !== '-' ? `${item.attendance}%` : '-'}</td>
@@ -488,11 +520,11 @@ const StudentDashboard = () => {
                                                     </>
                                                 )}
 
-                                                {selectedCIE === 'CIE-1' && <><td>{item.cie1 !== '-' ? `${item.cie1} / 50` : '-'}</td><td>{item.cie1Att !== '-' ? `${item.cie1Att}%` : '-'}</td></>}
-                                                {selectedCIE === 'CIE-2' && <><td>{item.cie2 !== '-' ? `${item.cie2} / 50` : '-'}</td><td>{item.cie2Att !== '-' ? `${item.cie2Att}%` : '-'}</td></>}
-                                                {selectedCIE === 'CIE-3' && <><td>{item.cie3 !== '-' ? `${item.cie3} / 50` : '-'}</td><td>{item.cie3Att !== '-' ? `${item.cie3Att}%` : '-'}</td></>}
-                                                {selectedCIE === 'CIE-4' && <><td>{item.cie4 !== '-' ? `${item.cie4} / 50` : '-'}</td><td>{item.cie4Att !== '-' ? `${item.cie4Att}%` : '-'}</td></>}
-                                                {selectedCIE === 'CIE-5' && <><td>{item.cie5 !== '-' ? `${item.cie5} / 50` : '-'}</td><td>{item.cie5Att !== '-' ? `${item.cie5Att}%` : '-'}</td></>}
+                                                {selectedCIE === 'CIE-1' && !isRestricted && <><td>{item.cie1 !== '-' ? `${item.cie1} / 50` : '-'}</td><td>{item.cie1Att !== '-' ? `${item.cie1Att}%` : '-'}</td></>}
+                                                {selectedCIE === 'CIE-2' && !isRestricted && <><td>{item.cie2 !== '-' ? `${item.cie2} / 50` : '-'}</td><td>{item.cie2Att !== '-' ? `${item.cie2Att}%` : '-'}</td></>}
+                                                {selectedCIE === 'CIE-3' && !isRestricted && <><td>{item.cie3 !== '-' ? `${item.cie3} / 50` : '-'}</td><td>{item.cie3Att !== '-' ? `${item.cie3Att}%` : '-'}</td></>}
+                                                {selectedCIE === 'CIE-4' && !isRestricted && <><td>{item.cie4 !== '-' ? `${item.cie4} / 50` : '-'}</td><td>{item.cie4Att !== '-' ? `${item.cie4Att}%` : '-'}</td></>}
+                                                {selectedCIE === 'CIE-5' && !isRestricted && <><td>{item.cie5 !== '-' ? `${item.cie5} / 50` : '-'}</td><td>{item.cie5Att !== '-' ? `${item.cie5Att}%` : '-'}</td></>}
 
                                                 <td style={{ fontWeight: 'bold' }}>{item.total} / {selectedCIE === 'All' ? 250 : 50}</td>
                                                 {(() => {

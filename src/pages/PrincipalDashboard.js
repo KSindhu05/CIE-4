@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import styles from './PrincipalDashboard.module.css';
 import {
     LayoutDashboard, Users, ShieldCheck, Calendar, BarChart2,
-    Briefcase, Bell, AlertTriangle, FileText, Building, LogOut
+    Briefcase, Bell, AlertTriangle, FileText, Building, LogOut,
+    RotateCw, Settings, Trash2, GraduationCap
 } from 'lucide-react';
 import headerLogo from '../assets/header_logo.png';
 
@@ -23,7 +24,8 @@ import {
 
 import {
     fetchPrincipalDashboard, fetchAllFaculty, fetchTimetables,
-    fetchNotifications, fetchReports, fetchHods, createHod, updateHod, deleteHod
+    fetchNotifications, fetchReports, fetchHods, createHod, updateHod, deleteHod,
+    fetchSemesterStatus, updateSemesterStatus, resetMarks, resetFaculty, cleanupData, shiftSemesters
 } from '../services/api';
 
 const API_BASE_URL = 'http://127.0.0.1:8084/api';
@@ -41,6 +43,8 @@ const PrincipalDashboard = () => {
     const [reports, setReports] = useState([]);
 
     const [loading, setLoading] = useState(true);
+    const [semesterStatus, setSemesterStatus] = useState('ACTIVE');
+    const [resetLoading, setResetLoading] = useState(false);
 
     // Directory State
     const [selectedDept, setSelectedDept] = useState(null);
@@ -71,14 +75,16 @@ const PrincipalDashboard = () => {
                     hods,
                     times,
                     notifs,
-                    reps
+                    reps,
+                    semStatus
                 ] = await Promise.all([
                     fetchPrincipalDashboard(token),
                     fetchAllFaculty(token),
                     fetchHods(token),
                     fetchTimetables(token),
                     fetchNotifications(token),
-                    fetchReports(token)
+                    fetchReports(token),
+                    fetchSemesterStatus()
                 ]);
 
                 if (dashData) setDashboardData(dashData);
@@ -92,6 +98,7 @@ const PrincipalDashboard = () => {
                 if (times) setTimetables(times);
                 if (notifs) setNotifications(notifs);
                 if (reps) setReports(reps);
+                if (semStatus) setSemesterStatus(semStatus.status);
 
             } catch (error) {
                 console.error("Failed to load dashboard data details:", error);
@@ -153,7 +160,8 @@ const PrincipalDashboard = () => {
         { label: 'CIE Schedule', path: '#timetables', icon: <Calendar size={20} />, isActive: activeTab === 'timetables', onClick: () => setActiveTab('timetables') },
         { label: 'CIE Compliance', path: '#compliance', icon: <ShieldCheck size={20} />, isActive: activeTab === 'compliance', onClick: () => setActiveTab('compliance') },
         { label: 'Reports & Analytics', path: '#reports', icon: <FileText size={20} />, isActive: activeTab === 'reports', onClick: () => setActiveTab('reports') },
-        { label: 'Notifications', path: '#notifications', icon: <Bell size={20} />, isActive: activeTab === 'notifications', onClick: () => setActiveTab('notifications') }
+        { label: 'Notifications', path: '#notifications', icon: <Bell size={20} />, isActive: activeTab === 'notifications', onClick: () => setActiveTab('notifications') },
+        { label: 'Semester Reset', path: '#semester', icon: <Settings size={20} />, isActive: activeTab === 'semester-management', onClick: () => setActiveTab('semester-management') }
     ];
 
     /* Chart Configs and Helper Logic */
@@ -229,12 +237,27 @@ const PrincipalDashboard = () => {
             });
             const data = await res.json();
             showToast(data.message || 'Message sent!', 'success');
+
+            // Immediately show the sent message in the notifications list
+            const scopeLabel = msgTargetDept && msgTargetDept !== 'ALL'
+                ? `${msgTargetDept} ${msgRecipientType}s`
+                : `All ${msgRecipientType}s`;
+            const sentNotif = {
+                id: `local-${Date.now()}`,
+                message: msgText,
+                type: 'SENT',
+                category: `📤 Sent to ${scopeLabel}`,
+                createdAt: new Date().toISOString(),
+                isRead: true
+            };
+            setNotifications(prev => [sentNotif, ...prev]);
             setMsgText('');
         } catch (err) {
             console.error('Send notification error:', err);
             showToast('Failed to send notification', 'error');
         }
     }, [msgText, msgRecipientType, msgTargetDept, user, showToast]);
+
 
     const handleClearNotifications = useCallback(async () => {
         try {
@@ -398,7 +421,347 @@ const PrincipalDashboard = () => {
                     onDelete={handleDeleteNotification}
                 />}
                 {activeTab === 'reports' && <ReportsSection reports={reports} onDownload={handleDownload} />}
+
+                {activeTab === 'semester-management' && (
+                    <div style={{ animation: 'fadeIn 0.6s ease' }}>
+                        {/* 🔥 Danger Banner */}
+                        <div style={{
+                            background: 'linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%)',
+                            borderRadius: '16px', padding: '2rem 2.5rem', marginBottom: '2rem',
+                            border: '1px solid #fca5a5',
+                            boxShadow: '0 4px 24px rgba(239,68,68,0.08)',
+                            position: 'relative', overflow: 'hidden'
+                        }}>
+                            <div style={{
+                                position: 'absolute', top: '-50%', right: '-10%',
+                                width: '300px', height: '300px', borderRadius: '50%',
+                                background: 'radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)',
+                                pointerEvents: 'none'
+                            }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative' }}>
+                                <div style={{
+                                    background: '#fee2e2', border: '1px solid #fca5a5',
+                                    borderRadius: '12px', padding: '0.75rem',
+                                    boxShadow: '0 2px 8px rgba(239,68,68,0.15)'
+                                }}>
+                                    <AlertTriangle size={28} color="#dc2626" />
+                                </div>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.5px' }}>
+                                        Semester-End Management
+                                    </h2>
+                                    <p style={{ margin: '0.25rem 0 0', color: '#dc2626', fontSize: '0.85rem', fontWeight: 500 }}>
+                                        ⚠️ All actions below are permanent and institution-wide. Proceed with caution.
+                                    </p>
+                                </div>
+                                <div style={{ marginLeft: 'auto' }}>
+                                    <span style={{
+                                        background: semesterStatus === 'ACTIVE'
+                                            ? 'linear-gradient(135deg, #065f46, #059669)'
+                                            : 'linear-gradient(135deg, #7c2d12, #ea580c)',
+                                        color: 'white', padding: '0.4rem 1.2rem',
+                                        borderRadius: '999px', fontSize: '0.8rem', fontWeight: 700,
+                                        letterSpacing: '1px', textTransform: 'uppercase',
+                                        boxShadow: semesterStatus === 'ACTIVE'
+                                            ? '0 0 15px rgba(5,150,105,0.5)'
+                                            : '0 0 15px rgba(234,88,12,0.5)',
+                                        display: 'inline-block'
+                                    }}>
+                                        ● {semesterStatus}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Cards Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+
+                            {/* Card 1: Semester Status */}
+                            <div style={{
+                                background: '#ffffff',
+                                borderRadius: '16px', padding: '1.75rem',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                animation: 'fadeIn 0.5s ease 0.1s both',
+                                cursor: 'default'
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                    <div style={{
+                                        background: '#eff6ff',
+                                        borderRadius: '12px', padding: '0.75rem',
+                                        boxShadow: '0 2px 8px rgba(99,102,241,0.1)'
+                                    }}>
+                                        <GraduationCap size={22} color="#4f46e5" />
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '1px',
+                                        color: '#64748b', padding: '0.25rem 0.6rem',
+                                        border: '1px solid #e2e8f0', borderRadius: '6px'
+                                    }}>CONTROL</div>
+                                </div>
+                                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700, color: '#1e293b' }}>Semester Status</h3>
+                                <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                                    Toggle between <strong style={{ color: '#4f46e5' }}>ACTIVE</strong> and <strong style={{ color: '#f97316' }}>COMPLETED</strong> to control what students can see.
+                                </p>
+                                <button
+                                    onClick={async () => {
+                                        const newStatus = semesterStatus === 'ACTIVE' ? 'COMPLETED' : 'ACTIVE';
+                                        try {
+                                            await updateSemesterStatus(user?.token, newStatus);
+                                            setSemesterStatus(newStatus);
+                                            showToast(`Semester marked as ${newStatus}`, 'success');
+                                        } catch (e) { showToast('Failed to update status', 'error'); }
+                                    }}
+                                    style={{
+                                        width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                        background: '#ffffff',
+                                        color: '#1e293b', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', letterSpacing: '0.5px'
+                                    }}
+                                    onMouseEnter={e => {
+                                        e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.08)';
+                                        e.currentTarget.style.borderColor = '#cbd5e1';
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                    }}
+                                >
+                                    Mark as {semesterStatus === 'ACTIVE' ? 'COMPLETED' : 'ACTIVE'}
+                                </button>
+                            </div>
+
+                            {/* Card 2: Clear Marks */}
+                            <div style={{
+                                background: '#ffffff',
+                                borderRadius: '16px', padding: '1.75rem',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                animation: 'fadeIn 0.5s ease 0.2s both'
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                    <div style={{
+                                        background: '#fef2f2',
+                                        borderRadius: '12px', padding: '0.75rem',
+                                        boxShadow: '0 2px 8px rgba(239,68,68,0.1)'
+                                    }}>
+                                        <Trash2 size={22} color="#dc2626" />
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '1px',
+                                        color: '#dc2626', padding: '0.25rem 0.6rem',
+                                        border: '1px solid #fca5a5', borderRadius: '6px'
+                                    }}>DANGER</div>
+                                </div>
+                                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700, color: '#1e293b' }}>Clear Academic Marks</h3>
+                                <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                                    Permanently wipe all CIE marks for every student across all departments. <strong style={{ color: '#dc2626' }}>Irreversible.</strong>
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("CRITICAL: Are you sure you want to WIPE ALL MARKS? This cannot be undone.")) {
+                                            setResetLoading(true);
+                                            resetMarks(user?.token)
+                                                .then(() => showToast('All Marks Cleared', 'success'))
+                                                .catch(() => showToast('Failed to clear marks', 'error'))
+                                                .finally(() => setResetLoading(false));
+                                        }
+                                    }}
+                                    disabled={resetLoading}
+                                    style={{
+                                        width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                        background: '#ffffff',
+                                        color: '#1e293b', fontWeight: 600, fontSize: '0.9rem', cursor: resetLoading ? 'not-allowed' : 'pointer',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', opacity: resetLoading ? 0.7 : 1
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (!resetLoading) {
+                                            e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.08)';
+                                            e.currentTarget.style.borderColor = '#cbd5e1';
+                                        }
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                    }}
+                                >
+                                    {resetLoading ? '⏳ Clearing...' : '🗑️ Clear All Marks'}
+                                </button>
+                            </div>
+
+                            {/* Card 3: Shift Semester */}
+                            <div style={{
+                                background: '#ffffff',
+                                borderRadius: '16px', padding: '1.75rem',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                animation: 'fadeIn 0.5s ease 0.3s both'
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                    <div style={{
+                                        background: '#f0fdf4',
+                                        borderRadius: '12px', padding: '0.75rem',
+                                        boxShadow: '0 2px 8px rgba(34,197,94,0.1)'
+                                    }}>
+                                        <RotateCw size={22} color="#16a34a" />
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '1px',
+                                        color: '#16a34a', padding: '0.25rem 0.6rem',
+                                        border: '1px solid #bbf7d0', borderRadius: '6px'
+                                    }}>PROGRESSION</div>
+                                </div>
+                                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700, color: '#1e293b' }}>Shift to Next Semester</h3>
+                                <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                                    Advance all students forward by one semester (e.g., <strong style={{ color: '#16a34a' }}>Sem 2 → 3</strong>). Students in 6th sem remain unchanged.
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm("Shift all students to the next academic semester?")) {
+                                            setResetLoading(true);
+                                            shiftSemesters(user?.token)
+                                                .then(() => showToast('Students Shifted Successfully', 'success'))
+                                                .catch(() => showToast('Failed to shift semesters', 'error'))
+                                                .finally(() => setResetLoading(false));
+                                        }
+                                    }}
+                                    disabled={resetLoading}
+                                    style={{
+                                        width: '100%', padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                        background: '#ffffff',
+                                        color: '#1e293b', fontWeight: 600, fontSize: '0.9rem', cursor: resetLoading ? 'not-allowed' : 'pointer',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', opacity: resetLoading ? 0.7 : 1
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (!resetLoading) {
+                                            e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.08)';
+                                            e.currentTarget.style.borderColor = '#cbd5e1';
+                                        }
+                                    }}
+                                    onMouseLeave={e => {
+                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                        e.currentTarget.style.borderColor = '#e2e8f0';
+                                    }}
+                                >
+                                    {resetLoading ? '⏳ Shifting...' : '🚀 Run Semester Shift'}
+                                </button>
+                            </div>
+
+                            {/* Card 4: Faculty & Data Cleanup */}
+                            <div style={{
+                                background: '#ffffff',
+                                borderRadius: '16px', padding: '1.75rem',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                                animation: 'fadeIn 0.5s ease 0.4s both'
+                            }}
+                                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.1)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.06)'; }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                                    <div style={{
+                                        background: '#faf5ff',
+                                        borderRadius: '12px', padding: '0.75rem',
+                                        boxShadow: '0 2px 8px rgba(168,85,247,0.1)'
+                                    }}>
+                                        <Settings size={22} color="#7c3aed" />
+                                    </div>
+                                    <div style={{
+                                        fontSize: '0.7rem', fontWeight: 700, letterSpacing: '1px',
+                                        color: '#7c3aed', padding: '0.25rem 0.6rem',
+                                        border: '1px solid #e9d5ff', borderRadius: '6px'
+                                    }}>CLEANUP</div>
+                                </div>
+                                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.15rem', fontWeight: 700, color: '#1e293b' }}>Faculty & Data Cleanup</h3>
+                                <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+                                    Reset faculty workloads and wipe all notifications &amp; CIE schedules to prep for the next academic session.
+                                </p>
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Reset all faculty assignments?")) {
+                                                resetFaculty(user?.token)
+                                                    .then(() => showToast('Faculty Workloads Reset', 'success'))
+                                                    .catch(() => showToast('Failed to reset faculty', 'error'));
+                                            }
+                                        }}
+                                        style={{
+                                            flex: 1, padding: '0.7rem', border: '1px solid #e2e8f0',
+                                            borderRadius: '10px', background: '#ffffff',
+                                            color: '#1e293b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                                            e.currentTarget.style.borderColor = '#cbd5e1';
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                            e.currentTarget.style.borderColor = '#e2e8f0';
+                                        }}
+                                    >
+                                        👤 Reset Faculty
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm("Cleanup all notifications and schedules?")) {
+                                                cleanupData(user?.token)
+                                                    .then(() => showToast('System Cleanup Done', 'success'))
+                                                    .catch(() => showToast('Cleanup failed', 'error'));
+                                            }
+                                        }}
+                                        style={{
+                                            flex: 1, padding: '0.7rem', border: '1px solid #e2e8f0',
+                                            borderRadius: '10px', background: '#ffffff',
+                                            color: '#1e293b', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        }}
+                                        onMouseEnter={e => {
+                                            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                                            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                                            e.currentTarget.style.borderColor = '#cbd5e1';
+                                        }}
+                                        onMouseLeave={e => {
+                                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                            e.currentTarget.style.borderColor = '#e2e8f0';
+                                        }}
+                                    >
+                                        🧹 Wipe Schedules
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
+
 
             {/* Interaction Modals */}
             <ToastNotification show={toast.show} msg={toast.msg} type={toast.type} />

@@ -209,3 +209,82 @@ export const deleteHod = async (token, id) => {
         throw error;
     }
 };
+
+export const fetchSemesterStatus = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/status`);
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Fetch semester status error:', error);
+        return { status: 'ACTIVE' };
+    }
+};
+
+export const updateSemesterStatus = async (token, status) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ status })
+        });
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Update semester status error:', error);
+        throw error;
+    }
+};
+
+export const resetMarks = async (token) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/reset-marks`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Reset marks error:', error);
+        throw error;
+    }
+};
+
+export const resetFaculty = async (token) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/reset-faculty`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Reset faculty error:', error);
+        throw error;
+    }
+};
+
+export const cleanupData = async (token) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/cleanup-data`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Cleanup data error:', error);
+        throw error;
+    }
+};
+
+export const shiftSemesters = async (token) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/principal/semester/shift`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return await safeJson(response);
+    } catch (error) {
+        console.error('Shift semesters error:', error);
+        throw error;
+    }
+};

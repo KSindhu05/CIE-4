@@ -22,6 +22,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,6 +55,108 @@ public class PrincipalController {
 
     @Autowired
     PasswordEncoder passwordEncoder;
+
+    private static String semesterStatus = "ACTIVE";
+
+    @GetMapping("/semester/status")
+    public ResponseEntity<?> getSemesterStatus() {
+        return ResponseEntity.ok(Map.of("status", semesterStatus));
+    }
+
+    @PutMapping("/semester/status")
+    @PreAuthorize("hasRole('PRINCIPAL')")
+    public ResponseEntity<?> updateSemesterStatus(@RequestBody Map<String, String> statusData) {
+        String newStatus = statusData.get("status");
+        if (newStatus != null && (newStatus.equals("ACTIVE") || newStatus.equals("COMPLETED"))) {
+            semesterStatus = newStatus;
+            return ResponseEntity.ok(Map.of("status", semesterStatus));
+        }
+        return ResponseEntity.badRequest().body(Map.of("message", "Invalid status"));
+    }
+
+    @PostMapping("/semester/reset-marks")
+    @PreAuthorize("hasRole('PRINCIPAL')")
+    @Transactional
+    public ResponseEntity<?> resetMarks() {
+        List<com.example.ia.entity.CieMark> allMarks = cieMarkRepository.findAll();
+        java.util.Map<String, Double> totals = new java.util.HashMap<>();
+
+        for (com.example.ia.entity.CieMark m : allMarks) {
+            if (m.getMarks() != null && m.getStudent() != null && m.getSubject() != null) {
+                String key = m.getStudent().getId() + "_" + m.getSubject().getId();
+                totals.put(key, totals.getOrDefault(key, 0.0) + m.getMarks());
+            }
+        }
+
+        cieMarkRepository.deleteAll();
+
+        List<com.example.ia.entity.CieMark> archivedMarks = new java.util.ArrayList<>();
+        for (com.example.ia.entity.CieMark m : allMarks) {
+            if (m.getMarks() != null && m.getStudent() != null && m.getSubject() != null) {
+                String key = m.getStudent().getId() + "_" + m.getSubject().getId();
+                if (totals.containsKey(key)) {
+                    com.example.ia.entity.CieMark archive = new com.example.ia.entity.CieMark();
+                    archive.setStudent(m.getStudent());
+                    archive.setSubject(m.getSubject());
+                    archive.setCieType("TOTAL");
+                    archive.setMarks(totals.get(key));
+                    archive.setStatus("APPROVED");
+                    archivedMarks.add(archive);
+                    totals.remove(key); // prevent duplicates
+                }
+            }
+        }
+
+        if (!archivedMarks.isEmpty()) {
+            cieMarkRepository.saveAll(archivedMarks);
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Individual marks wiped. Total marks securely archived."));
+    }
+
+    @PostMapping("/semester/reset-faculty")
+    @PreAuthorize("hasRole('PRINCIPAL')")
+    @Transactional
+    public ResponseEntity<?> resetFaculty() {
+        List<User> faculty = userRepository.findByRole("FACULTY");
+        for (User f : faculty) {
+            f.setSubjects(null);
+            f.setSemester(null);
+            f.setSection(null);
+            userRepository.save(f);
+        }
+        return ResponseEntity.ok(Map.of("message", "Faculty workloads and assignments have been reset."));
+    }
+
+    @PostMapping("/semester/cleanup-data")
+    @PreAuthorize("hasRole('PRINCIPAL')")
+    @Transactional
+    public ResponseEntity<?> cleanupData() {
+        notificationRepository.deleteAll();
+        announcementRepository.deleteAll();
+        attendanceRepository.deleteAll();
+        return ResponseEntity
+                .ok(Map.of("message", "Notifications, CIE schedules, and attendance records have been cleaned up."));
+    }
+
+    @PostMapping("/semester/shift")
+    @PreAuthorize("hasRole('PRINCIPAL')")
+    @Transactional
+    public ResponseEntity<?> shiftSemesters() {
+        List<Student> students = studentRepository.findAll();
+        for (Student s : students) {
+            if (s.getSemester() != null) {
+                if (s.getSemester() < 6) {
+                    s.setSemester(s.getSemester() + 1);
+                } else {
+                    // 6th semester students stay at 6 or could be moved to alumni?
+                    // For now, keeping them at 6 to avoid deletion.
+                }
+                studentRepository.save(s);
+            }
+        }
+        return ResponseEntity.ok(Map.of("message", "All students have been shifted to the next semester."));
+    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasRole('PRINCIPAL')")
@@ -273,8 +377,13 @@ public class PrincipalController {
     }
 
     @GetMapping("/notifications")
+    @PreAuthorize("hasRole('PRINCIPAL')")
     public List<Notification> getNotifications() {
-        return notificationRepository.findAll(); // Or filter by target role
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User principal = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        if (principal == null)
+            return List.of();
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(principal.getId());
     }
     /*
      * @GetMapping("/circulars")
