@@ -2062,7 +2062,206 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
                     </div>
                 </div>
             </div>)}
-            {activeTab === 'cie-schedule' && (<div className={styles.cieScheduleContainer}><div className={styles.gridTwo}><div className={styles.card}><h3>{editingScheduleId ? 'Edit CIE Exam Schedule' : 'Schedule New CIE Exam'}</h3><form onSubmit={handleScheduleSubmit} id="scheduleFormSection" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}><div className={styles.formGroup}><label>Select Subject</label><select name="subjectId" required className={styles.deptSelect} style={{ width: '100%' }}><option value="">-- Choose Subject --</option>{subjects.map(sub => (<option key={sub.id} value={sub.id}>{sub.name} ({sub.code})</option>))}</select></div><div className={styles.formGroup}><label>CIE Number</label><div style={{ display: 'flex', gap: '0.5rem' }}>{[1, 2, 3, 4, 5].map(num => (<label key={num} style={{ flex: 1, padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px', textAlign: 'center', cursor: 'pointer', background: scheduleForm.cieNumber === num ? '#eff6ff' : 'white', borderColor: scheduleForm.cieNumber === num ? '#3b82f6' : '#cbd5e1', color: scheduleForm.cieNumber === num ? '#2563eb' : '#64748b', fontWeight: scheduleForm.cieNumber === num ? '600' : '400' }}><input type="radio" name="cieNumber" value={num} checked={scheduleForm.cieNumber === num} onChange={() => setScheduleForm({ ...scheduleForm, cieNumber: num })} style={{ display: 'none' }} />CIE-{num}</label>))}</div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}><div className={styles.formGroup}><label>Date</label><input type="date" name="scheduledDate" required className={styles.input} /></div><div className={styles.formGroup}><label>Time</label><input type="time" name="startTime" required className={styles.input} /></div></div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}><div className={styles.formGroup}><label>Duration (mins)</label><input type="number" name="durationMinutes" defaultValue="60" className={styles.input} /></div><div className={styles.formGroup}><label>Room / Hall</label><input name="examRoom" placeholder="e.g. LH-201" className={styles.input} /></div></div><div className={styles.formGroup}><label>Integration Instructions (Optional)</label><textarea name="instructions" placeholder="Special instructions for faculty/students..." className={styles.input} style={{ minHeight: '80px', resize: 'vertical' }}></textarea></div><div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>{editingScheduleId && (<button type="button" className={styles.secondaryBtn} onClick={cancelEdit} style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>)}<button type="submit" className={styles.primaryBtn} style={{ flex: 2, justifyContent: 'center' }}><Megaphone size={18} /> {editingScheduleId ? 'Update Schedule' : 'Publish Schedule'}</button></div></form></div><div className={styles.card}><h3>Upcoming Scheduled Exams</h3><div className={styles.alertList}>{departmentAnnouncements.length > 0 ? departmentAnnouncements.map(ann => (<div key={ann.id} className={`${styles.alertItem} ${styles.info}`} style={{ alignItems: 'center' }}><div style={{ background: 'white', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '60px' }}><span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 'bold', color: '#2563eb' }}>{new Date(ann.scheduledDate).getDate()}</span><span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b' }}>{new Date(ann.scheduledDate).toLocaleString('default', { month: 'short' })}</span></div><div style={{ flex: 1 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem', color: '#1e293b' }}>{ann.subject ? ann.subject.name : 'Unknown Subject'} <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}>({ann.subject?.code})</span></h4><span className={styles.statusBadge} style={{ background: '#dbeafe', color: '#1e40af' }}>CIE-{ann.cieNumber}</span></div><p style={{ display: 'flex', gap: '1rem', alignItems: 'center', color: '#475569', fontSize: '0.85rem' }}><span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12} /> {ann.startTime || '10:00 AM'} ({ann.durationMinutes}m)</span>{ann.examRoom && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {ann.examRoom}</span>}</p></div><div style={{ display: 'flex', gap: '8px' }}>{ann.questionPaperPath && (<button className={styles.iconBtn} onClick={() => window.open(`${API_BASE_URL}/cie/download/${ann.questionPaperPath}`, '_blank')} title="Download Question Paper" style={{ color: '#16a34a', background: '#dcfce7' }}><Download size={16} /></button>)}<button className={styles.iconBtn} onClick={() => handleEditSchedule(ann)} title="Edit" style={{ color: '#2563eb', background: '#dbeafe' }}><Edit size={16} /></button><button className={styles.iconBtn} onClick={() => handleDeleteSchedule(ann.id)} title="Delete" style={{ color: '#dc2626', background: '#fee2e2' }}><Trash2 size={16} /></button></div></div>)) : (<div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No exams scheduled yet.</div>)}</div></div></div></div>)}
+            {activeTab === 'cie-schedule' && (
+                <div className={styles.cieScheduleContainer}>
+                    <div className={styles.gridTwo}>
+                        <div className={styles.card}>
+                            <h3>{editingScheduleId ? 'Edit CIE Exam Schedule' : 'Schedule New CIE Exam'}</h3>
+                            <form onSubmit={handleScheduleSubmit} id="scheduleFormSection" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                <div className={styles.formGroup}>
+                                    <label>Select Subject</label>
+                                    <select name="subjectId" required className={styles.deptSelect} style={{ width: '100%' }}>
+                                        <option value="">-- Choose Subject --</option>
+                                        {subjects.map(sub => (
+                                            <option key={sub.id} value={sub.id}>{sub.name} ({sub.code})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>CIE Number</label>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        {[1, 2, 3, 4, 5].map(num => (
+                                            <label key={num} style={{
+                                                flex: 1,
+                                                padding: '0.75rem',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '8px',
+                                                textAlign: 'center',
+                                                cursor: 'pointer',
+                                                background: scheduleForm.cieNumber === num ? '#eff6ff' : 'white',
+                                                borderColor: scheduleForm.cieNumber === num ? '#3b82f6' : '#cbd5e1',
+                                                color: scheduleForm.cieNumber === num ? '#2563eb' : '#64748b',
+                                                fontWeight: scheduleForm.cieNumber === num ? '600' : '400'
+                                            }}>
+                                                <input type="radio" name="cieNumber" value={num} checked={scheduleForm.cieNumber === num} onChange={() => setScheduleForm({ ...scheduleForm, cieNumber: num })} style={{ display: 'none' }} />
+                                                CIE-{num}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className={styles.formGroup}>
+                                        <label>Date</label>
+                                        <input type="date" name="scheduledDate" required className={styles.input} />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label>Time</label>
+                                        <input type="time" name="startTime" required className={styles.input} />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className={styles.formGroup}>
+                                        <label>Duration (mins)</label>
+                                        <input type="number" name="durationMinutes" defaultValue="60" className={styles.input} />
+                                    </div>
+                                    <div className={styles.formGroup}>
+                                        <label>Room / Hall</label>
+                                        <input name="examRoom" placeholder="e.g. LH-201" className={styles.input} />
+                                    </div>
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label>Integration Instructions (Optional)</label>
+                                    <textarea name="instructions" placeholder="Special instructions for faculty/students..." className={styles.input} style={{ minHeight: '80px', resize: 'vertical' }}></textarea>
+                                </div>
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                    {editingScheduleId && (
+                                        <button type="button" className={styles.secondaryBtn} onClick={cancelEdit} style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
+                                    )}
+                                    <button type="submit" className={styles.primaryBtn} style={{ flex: 2, justifyContent: 'center' }}>
+                                        <Megaphone size={18} /> {editingScheduleId ? 'Update Schedule' : 'Publish Schedule'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div className={styles.card}>
+                            <h3>Upcoming Scheduled Exams</h3>
+                            <div className={styles.alertList}>
+                                {departmentAnnouncements.length > 0 ? departmentAnnouncements.map(ann => (
+                                    <div key={ann.id} className={`${styles.alertItem} ${styles.info}`} style={{ alignItems: 'center' }}>
+                                        <div style={{ background: 'white', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', minWidth: '60px' }}>
+                                            <span style={{ display: 'block', fontSize: '1.2rem', fontWeight: 'bold', color: '#2563eb' }}>
+                                                {new Date(ann.scheduledDate).getDate()}
+                                            </span>
+                                            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b' }}>
+                                                {new Date(ann.scheduledDate).toLocaleString('default', { month: 'short' })}
+                                            </span>
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <h4 style={{ margin: '0 0 0.25rem', fontSize: '1rem', color: '#1e293b' }}>
+                                                    {ann.subject ? ann.subject.name : 'Unknown Subject'}
+                                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 'normal' }}> ({ann.subject?.code})</span>
+                                                </h4>
+                                                <span className={styles.statusBadge} style={{ background: '#dbeafe', color: '#1e40af' }}>CIE-{ann.cieNumber}</span>
+                                            </div>
+                                            <p style={{ display: 'flex', gap: '1rem', alignItems: 'center', color: '#475569', fontSize: '0.85rem' }}>
+                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12} /> {ann.startTime || '10:00 AM'} ({ann.durationMinutes}m)</span>
+                                                {ann.examRoom && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={12} /> {ann.examRoom}</span>}
+                                            </p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            {ann.questionPaperPath && (
+                                                <button className={styles.iconBtn} onClick={() => window.open(`${API_BASE_URL}/cie/download/${ann.questionPaperPath}`, '_blank')} title="Download Question Paper" style={{ color: '#16a34a', background: '#dcfce7' }}>
+                                                    <Download size={16} />
+                                                </button>
+                                            )}
+                                            <button className={styles.iconBtn} onClick={() => handleEditSchedule(ann)} title="Edit" style={{ color: '#2563eb', background: '#dbeafe' }}>
+                                                <Edit size={16} />
+                                            </button>
+                                            <button className={styles.iconBtn} onClick={() => handleDeleteSchedule(ann.id)} title="Delete" style={{ color: '#dc2626', background: '#fee2e2' }}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No exams scheduled yet.</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* NEW: Question Paper Repository Section */}
+                    <div className={styles.card} style={{ marginTop: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <FileText size={24} color="#2563eb" /> 📁 Question Paper Repository (Faculty Uploads)
+                            </h3>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', background: '#f1f5f9', padding: '4px 12px', borderRadius: '20px' }}>
+                                {departmentAnnouncements.filter(a => a.questionPaperPath).length} Papers Uploaded
+                            </span>
+                        </div>
+                        <div className={styles.tableWrapper}>
+                            <table className={styles.table} style={{ width: '100%' }}>
+                                <thead>
+                                    <tr>
+                                        <th>Subject</th>
+                                        <th>CIE</th>
+                                        <th>Uploaded By</th>
+                                        <th>Status</th>
+                                        <th style={{ textAlign: 'right' }}>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {departmentAnnouncements.filter(a => a.questionPaperPath).length > 0 ? (
+                                        departmentAnnouncements
+                                            .filter(a => a.questionPaperPath)
+                                            .sort((a, b) => new Date(b.scheduledDate) - new Date(a.scheduledDate))
+                                            .map(ann => (
+                                                <tr key={ann.id}>
+                                                    <td>
+                                                        <div style={{ fontWeight: 600, color: '#1e293b' }}>{ann.subject?.name}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{ann.subject?.code}</div>
+                                                    </td>
+                                                    <td>
+                                                        <span className={styles.statusBadge} style={{ background: '#eff6ff', color: '#2563eb' }}>CIE-{ann.cieNumber}</span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
+                                                                {ann.faculty?.username?.substring(0, 2).toUpperCase() || 'F'}
+                                                            </div>
+                                                            <span style={{ fontSize: '0.9rem' }}>{ann.faculty?.username || 'Unknown Faculty'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '0.85rem', fontWeight: 500 }}>
+                                                            <CheckCircle size={14} /> Ready for Review
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'right' }}>
+                                                        <button
+                                                            className={styles.primaryBtn}
+                                                            style={{
+                                                                padding: '0.5rem 1rem',
+                                                                fontSize: '0.85rem',
+                                                                background: '#16a34a',
+                                                                borderColor: '#16a34a',
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px'
+                                                            }}
+                                                            onClick={() => window.open(`${API_BASE_URL}/cie/download/${ann.questionPaperPath}`, '_blank')}
+                                                        >
+                                                            <Download size={16} /> View / Download
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                                                <FileText size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
+                                                <p>No question papers have been uploaded by faculty yet.</p>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
             {activeTab === 'reports' && (<div className={styles.sectionContainer}><h2 className={styles.sectionTitle}>Reports & Archives</h2><div className={styles.cardsGrid}><div className={styles.card}><div className={styles.cardHeader}><h3 className={styles.cardTitle}>IA Marks Report</h3></div><div style={{ padding: '1rem', color: '#666' }}><p>Download comprehensive PDF report of IA marks for all subjects in {selectedDept}.</p><button className={styles.primaryBtn} style={{ marginTop: '1rem', width: '100%', justifyContent: 'center' }} onClick={() => window.open(`${API_BASE_URL}/reports/marks/${selectedDept}/pdf`, '_blank')}><Download size={18} /> Download PDF</button></div></div></div></div>)}
             {activeTab === 'faculty-requests' && renderFacultyRequests()}
         </>
