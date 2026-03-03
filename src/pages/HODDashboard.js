@@ -311,6 +311,10 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
             email: facultyForm.email,
             designation: facultyForm.designation,
             department: selectedDept,
+            semester: facultyForm.semester || null,
+            section: facultyForm.section || null,
+            subjects: facultyForm.subjects || null,
+            cieRole: facultyForm.cieRole || null,
         };
         if (!editingFaculty && facultyForm.password) {
             data.password = facultyForm.password;
@@ -355,6 +359,9 @@ const HODDashboard = ({ isSpectator = false, spectatorDept = null }) => {
             email: fac.email || '',
             password: '',
             designation: fac.designation || 'Assistant Professor',
+            semester: fac.semester || '',
+            section: fac.section || '',
+            subjects: fac.subjects || '',
             cieRole: fac.cieRole || '' // Load existing cieRole
         });
         setShowAddFacultyModal(true);
